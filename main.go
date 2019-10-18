@@ -96,11 +96,12 @@ func jobSort(jobs []job, agents []processAgent) []processAgent {
 
 	//Agents are overcapacity so allocate best
 	if len(jobs) > 0 {
-		sort.Slice(agents, func(i, j int) bool {
-			return agents[i].Capacity < agents[j].Capacity
-		})
-
 		for len(jobs) > 0 {
+
+			sort.Slice(agents, func(i, j int) bool {
+				return agents[i].Capacity > agents[j].Capacity
+			})
+
 			for i := range agents {
 				agents[i].Add(jobs[0])
 				jobs = jobRemove(jobs, jobs[0])
