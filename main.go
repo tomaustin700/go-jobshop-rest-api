@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
 
 	"github.com/gorilla/mux"
 )
@@ -88,9 +89,23 @@ func jobSort(jobs []job, agents []processAgent) []processAgent {
 				continue
 			}
 			agents[i].Add(job)
-
+			jobs = jobRemove(jobs, job)
 			break
+		}
+	}
 
+	//Agents are overcapacity so allocate best
+	if len(jobs) > 0 {
+		sort.Slice(agents, func(i, j int) bool {
+			return agents[i].Capacity < agents[j].Capacity
+		})
+
+		for len(jobs) > 0 {
+			for i := range agents {
+				agents[i].Add(jobs[0])
+				jobs = jobRemove(jobs, jobs[0])
+				break
+			}
 		}
 	}
 
