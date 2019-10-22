@@ -16,38 +16,38 @@ type job struct {
 	Duration int
 }
 
-type agent struct {
-	AgentID int
+type resource struct {
+	ResourceID int
 }
 
 type payload struct {
-	Agents []agent
-	Jobs   []job
+	Resources []resource
+	Jobs      []job
 }
 
-type processAgent struct {
+type processResource struct {
 	ID       int
 	Capacity int
 	Jobs     []job
 }
 
-func (agent *processAgent) Add(j job) {
-	agent.Capacity -= j.Duration
-	agent.Jobs = append(agent.Jobs, j)
+func (resource *processResource) Add(j job) {
+	resource.Capacity -= j.Duration
+	resource.Jobs = append(resource.Jobs, j)
 }
 
-func (agent *processAgent) Remove(j job) {
-	agent.Capacity += j.Duration
+func (resource *processResource) Remove(j job) {
+	resource.Capacity += j.Duration
 
 	var indexValue int
 
-	for i := range agent.Jobs {
-		if agent.Jobs[i].Name == j.Name {
+	for i := range resource.Jobs {
+		if resource.Jobs[i].Name == j.Name {
 			indexValue = i
 		}
 	}
 
-	agent.Jobs = agent.Jobs[:indexValue+copy(agent.Jobs[indexValue:], agent.Jobs[indexValue+1:])]
+	resource.Jobs = resource.Jobs[:indexValue+copy(resource.Jobs[indexValue:], resource.Jobs[indexValue+1:])]
 }
 
 func getHealth(w http.ResponseWriter, r *http.Request) {
@@ -78,39 +78,58 @@ func jobRemove(jobs []job, itemToRemove job) []job {
 	return jobs[:indexValue+copy(jobs[indexValue:], jobs[indexValue+1:])]
 }
 
-func jobSort(jobs []job, agents []processAgent) []processAgent {
+func jobSort(jobs []job, resources []processResource) []processResource {
 
 	jobsCopy := make([]job, len(jobs))
 	copy(jobsCopy, jobs)
 
 	for _, job := range jobsCopy {
-		for i, agent := range agents {
-			if job.Duration > agent.Capacity {
+		for i, resource := range resources {
+			if job.Duration > resource.Capacity {
 				continue
 			}
-			agents[i].Add(job)
+			resources[i].Add(job)
 			jobs = jobRemove(jobs, job)
 			break
 		}
 	}
 
-	//Agents are overcapacity so allocate best
+	//Resources are overcapacity so allocate best
 	if len(jobs) > 0 {
 		for len(jobs) > 0 {
 
-			sort.Slice(agents, func(i, j int) bool {
-				return agents[i].Capacity > agents[j].Capacity
+			sort.Slice(resources, func(i, j int) bool {
+				return resources[i].Capacity > resources[j].Capacity
 			})
 
-			for i := range agents {
-				agents[i].Add(jobs[0])
+			for i := range resources {
+				resources[i].Add(jobs[0])
 				jobs = jobRemove(jobs, jobs[0])
 				break
 			}
 		}
 	}
 
-	return agents
+	//Add load balance logic later
+	// func Any(vs []string, f func(string) bool) bool {
+	// 	for _, v := range vs {
+	// 		if f(v) {
+	// 			return true
+	// 		}
+	// 	}
+	// 	return false
+	// }
+
+	// 	for _, v := resources vs {
+	// 		if f(v) {
+	// 			return true
+	// 		}
+	// 	}
+	// 	return false
+
+	// if (resources)
+
+	return resources
 }
 
 func process(w http.ResponseWriter, r *http.Request) {
@@ -122,15 +141,15 @@ func process(w http.ResponseWriter, r *http.Request) {
 
 	json.Unmarshal(reqBody, &body)
 
-	var agents []processAgent
+	var resources []processResource
 
 	maxValue := max(body.Jobs)
 
-	for _, agent := range body.Agents {
-		agents = append(agents, processAgent{ID: agent.AgentID, Capacity: maxValue})
+	for _, resource := range body.Resources {
+		resources = append(resources, processResource{ID: resource.ResourceID, Capacity: maxValue})
 	}
 
-	json.NewEncoder(w).Encode(jobSort(body.Jobs, agents))
+	json.NewEncoder(w).Encode(jobSort(body.Jobs, resources))
 }
 
 func main() {
