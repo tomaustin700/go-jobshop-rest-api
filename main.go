@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 
@@ -78,6 +79,23 @@ func jobRemove(jobs []job, itemToRemove job) []job {
 	return jobs[:indexValue+copy(jobs[indexValue:], jobs[indexValue+1:])]
 }
 
+func anyEmptyResources(vs []processResource) bool {
+	for _, v := range vs {
+		if len(v.Jobs) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func average(xs []processResource) int {
+	total := 0.00
+	for _, v := range xs {
+		total += float64(len(v.Jobs))
+	}
+	return int(math.Round(total / float64(len(xs))))
+}
+
 func jobSort(jobs []job, resources []processResource) []processResource {
 
 	jobsCopy := make([]job, len(jobs))
@@ -110,24 +128,51 @@ func jobSort(jobs []job, resources []processResource) []processResource {
 		}
 	}
 
-	//Add load balance logic later
-	// func Any(vs []string, f func(string) bool) bool {
-	// 	for _, v := range vs {
-	// 		if f(v) {
-	// 			return true
-	// 		}
-	// 	}
-	// 	return false
-	// }
+	//Load balance
+	if anyEmptyResources(resources) {
+		//Some resources have nothing to do so load balance
 
-	// 	for _, v := resources vs {
-	// 		if f(v) {
-	// 			return true
-	// 		}
-	// 	}
-	// 	return false
+		sort.Slice(resources, func(i, j int) bool {
+			return len(resources[i].Jobs) > len(resources[j].Jobs)
+		})
 
-	// if (resources)
+		avgLoad := average(resources)
+		idleResources := []processResource{}
+		for i, resource := range resources {
+			if len(resource.Jobs) == 0 {
+				idleResources = append(idleResources, resources[i])
+			}
+		}
+
+		for _, idleResouce := range idleResources {
+			aboveAverageLoad := []processResource{}
+			for i, resource := range resources {
+				if len(resource.Jobs) > avgLoad {
+					aboveAverageLoad = append(aboveAverageLoad, resources[i])
+				}
+			}
+
+			for _, aboveAverageResource := range aboveAverageLoad {
+
+				work := aboveAverageResource.Jobs[len(aboveAverageResource.Jobs)-1]
+				if idleResouce.Capacity-work.Duration > 0 {
+
+					for i, resource := range resources {
+						if resource.ID == idleResouce.ID {
+							resources[i].Add(work)
+						}
+
+						if resource.ID == aboveAverageResource.ID {
+							resources[i].Remove(work)
+						}
+
+					}
+				}
+
+			}
+		}
+
+	}
 
 	return resources
 }
